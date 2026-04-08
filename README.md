@@ -71,9 +71,9 @@ You can download the latest apcu release then apply the same changes that I did 
   ```
 2. Now search for the definition of each apcu functions that accept **key** parameter and find the point where apcu handed the zend string variable of the passed **key** and wrap it with the function **samerKey**:
   ```c
-  # e.g. find
+  // e.g. find
   apc_cache_stat(apc_user_cache, key, return_value);
-  # replace it with:
+  // replace it with:
   apc_cache_stat(apc_user_cache, samerKey(key), return_value);
   ```
 3. for those functions that accept either string or array of strings, there will be two places to edit, the first is the place where apcu check that the passed zval is actually string, and the other place is where apcu loop through the array and process its values.
