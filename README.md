@@ -18,11 +18,13 @@ Instead of relying on PHP developers to manually prefix their keys—a practice 
 
 Here is how the architecture works under the hood:
 
-1. Out-of-Band Pool Identification:
-When a PHP-FPM worker spawns, my code reads /proc/self/cmdline to safely extract the worker's exact pool name (e.g., php-fpm: pool tenant_A). It uses this name to generate a unique prefix. if the environment is heavily restricted (such as a strict chroot jail), the code gracefully falls back to using the Linux effective UID (geteuid()).
+1. Out-of-Band Pool Identification
 
-2. The "Zero-Allocation" Memory Magic:
-String formatting and memory allocation in C (malloc/free) are computationally expensive if performed on every single web request. To ensure this isolation patch didn't slow down APCu's legendary speed, I engineered a zero-allocation memory reuse strategy.
+   When a PHP-FPM worker spawns, my code reads /proc/self/cmdline to safely extract the worker's exact pool name (e.g., php-fpm: pool tenant_A). It uses this name to generate a unique prefix. if the environment is heavily restricted (such as a strict chroot jail), the code gracefully falls back to using the Linux effective UID (geteuid()).
+
+2. The "Zero-Allocation" Memory Magic
+
+   String formatting and memory allocation in C (malloc/free) are computationally expensive if performed on every single web request. To ensure this isolation patch didn't slow down APCu's legendary speed, I engineered a zero-allocation memory reuse strategy.
 
    - Worker-Lifetime Persistence: On the very first APCu call made by a worker process, the extension allocates a single, persistent zend_string buffer. This buffer is completely immune to PHP's garbage collector and lives for the entire lifespan of the FPM worker.
 
@@ -30,38 +32,39 @@ String formatting and memory allocation in C (malloc/free) are computationally e
 
    - Zend Engine Spoofing: Finally, the code dynamically mutates the struct's length (ZSTR_LEN) and forcefully resets its hash (h = 0). This tricks APCu into cleanly calculating a new hash for the securely combined string.
 
-3. Absolute Transparency:
-To the PHP application, absolutely nothing has changed. A script in Pool A can call apcu_store('db_config', $data). A script in Pool B can call apcu_store('db_config', $data). Both applications will fetch their respective data perfectly, completely unaware that in the server's physical RAM, their keys are securely locked away as pool_A_db_config and pool_B_db_config.
+3. Absolute Transparency
 
-By moving the security boundary down to the Zend Engine layer, this patch achieves true multi-tenant memory isolation without sacrificing a single microsecond of performance.
+   To the PHP application, absolutely nothing has changed. A script in Pool A can call apcu_store('db_config', $data). A script in Pool B can call apcu_store('db_config', $data). Both applications will fetch their respective data perfectly, completely unaware that in the server's physical RAM, their keys are securely locked away as pool_A_db_config and pool_B_db_config.
+
+   By moving the security boundary down to the Zend Engine layer, this patch achieves true multi-tenant memory isolation without sacrificing a single microsecond of performance.
 
 ## How to install
 Because this is a C-level patch, you must compile the extension from source (i.e. no pecl install). It only takes a few minutes.
 1. Download the latest APCu release (currently 5.1.28) from the official PECL repository or GitHub, and extract it:
-```bash
-wget https://pecl.php.net/get/apcu-5.1.28.tgz
-tar -xvf apcu-5.1.28.tgz
-cd apcu-5.1.28
-```
+   ```bash
+   wget https://pecl.php.net/get/apcu-5.1.28.tgz
+   tar -xvf apcu-5.1.28.tgz
+   cd apcu-5.1.28
+   ```
 2. Copy the files from this repository into the extracted APCu directory, overwriting the default C file:
-```bash
-# Assuming you cloned this repo into /tmp/apcu-fpm-isolation
-cp /tmp/apcu-fpm-isolation/samer.h .
-cp /tmp/apcu-fpm-isolation/php_apc.c . # this one must be replaced
-```
+   ```bash
+   # Assuming you cloned this repo into /tmp/apcu-fpm-isolation
+   cp /tmp/apcu-fpm-isolation/samer.h .
+   cp /tmp/apcu-fpm-isolation/php_apc.c . # this one must be replaced
+   ```
 3. Prepare the build environment using phpize, then compile and install:
-```bash
-phpize # or /php-install-prefix/bin/phpize 
-./configure # or ./configure --with-php-config=/php-install-prefix/bin/php-config
-make clean
-make
-make install
-```
+   ```bash
+   phpize # or /php-install-prefix/bin/phpize 
+   ./configure # or ./configure --with-php-config=/php-install-prefix/bin/php-config
+   make clean
+   make
+   make install
+   ```
 4. Add the extension to your PHP configuration
-> extension=apcu.so
+   > extension=apcu.so
 
-then restart php-fpm service 
-> systemctl restart php-fpm
+   then restart php-fpm service 
+   > systemctl restart php-fpm
 
 ### In case I stopped updating this repo
 You can download the latest apcu release then apply the same changes that I did to the file **php_apc.c** as follow:
