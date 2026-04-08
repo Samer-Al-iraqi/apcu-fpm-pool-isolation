@@ -90,25 +90,26 @@ While this extension successfully enforces cross-tenant memory isolation, system
 4. While this patch guarantees Data Integrity (Pool A cannot tamper with Pool B's keys), all data physically resides within the same shared memory segment (SHM). APCu does not support per-pool memory quotas. Therefore, a compromised or poorly coded application in one pool can maliciously or accidentally fill the entire cache, forcing APCu to evict legitimate keys belonging to other pools.
 
 5. If any pool calls apcu_clear_cache(), the underlying engine will still flush the entire shared memory segment, wiping data for all pools. If you wish to prevent this behavior, you can disable the function entirely in your php.ini:
+   ```ini
+   disable_functions = apcu_clear_cache
+   ```
+   Alternatively, if you want to hardcode this restriction into the extension itself, locate PHP_FUNCTION(apcu_clear_cache) in php_apc.c and add RETURN_FALSE; to the very top of the function block:
+   ```c
+   PHP_FUNCTION(apcu_clear_cache) {
+       /* SAMER HACK: Prevent any pool from wiping the global cache */
+       RETURN_FALSE; 
+       
+       // ... original code continues ...
+   }
+   ```
+   then the only way to clear the entire apcu cache is to restart fpm service.
 
-```ini
-disable_functions = apcu_clear_cache
-```
-Alternatively, if you want to hardcode this restriction into the extension itself, locate PHP_FUNCTION(apcu_clear_cache) in php_apc.c and add RETURN_FALSE; to the very top of the function block:
-```c
-PHP_FUNCTION(apcu_clear_cache) {
-    /* SAMER HACK: Prevent any pool from wiping the global cache */
-    RETURN_FALSE; 
-    
-    // ... original code continues ...
-}
-```
-then the only way to clear the entire apcu cache is to restart fpm service.
 5. Because the APCUIterator reads directly from the raw C hash tables—bypassing the standard Zend Engine parameter parsing—it bypasses our string hook. A pool utilizing the iterator will be able to see the raw, prefixed keys (and values) belonging to other pools. If absolute strict multi-tenant secrecy is required, you can try disabling APCUIterator in php.ini:
-```ini
-disable_classes=APCUIterator
-```
-PHP has **warnning** about disabling classes 
+   ```ini
+   disable_classes=APCUIterator
+   ```
+   PHP has **warnning** about disabling classes 
+
 6. The extension is highly optimized, initializing its persistent string buffer at 256 bytes (which covers 99.9% of real-world cache keys). If an application attempts to save an exceptionally long key (e.g., 1024+ bytes), the extension will safely and dynamically realloc the buffer to accommodate it. Because this buffer is persistent across the worker's lifetime, this memory reallocation only happens once per worker, ensuring zero performance penalty on all subsequent requests.
 
 
