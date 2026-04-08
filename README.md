@@ -18,10 +18,10 @@ Instead of relying on PHP developers to manually prefix their keys—a practice 
 
 Here is how the architecture works under the hood:
 
-1. Out-of-Band Pool Identification
+1. Out-of-Band Pool Identification:
 When a PHP-FPM worker spawns, my code reads /proc/self/cmdline to safely extract the worker's exact pool name (e.g., php-fpm: pool tenant_A). It uses this name to generate a unique prefix. if the environment is heavily restricted (such as a strict chroot jail), the code gracefully falls back to using the Linux effective UID (geteuid()).
 
-2. The "Zero-Allocation" Memory Magic
+2. The "Zero-Allocation" Memory Magic:
 String formatting and memory allocation in C (malloc/free) are computationally expensive if performed on every single web request. To ensure this isolation patch didn't slow down APCu's legendary speed, I engineered a zero-allocation memory reuse strategy.
 
    - Worker-Lifetime Persistence: On the very first APCu call made by a worker process, the extension allocates a single, persistent zend_string buffer. This buffer is completely immune to PHP's garbage collector and lives for the entire lifespan of the FPM worker.
@@ -30,7 +30,7 @@ String formatting and memory allocation in C (malloc/free) are computationally e
 
    - Zend Engine Spoofing: Finally, the code dynamically mutates the struct's length (ZSTR_LEN) and forcefully resets its hash (h = 0). This tricks APCu into cleanly calculating a new hash for the securely combined string.
 
-3. Absolute Transparency
+3. Absolute Transparency:
 To the PHP application, absolutely nothing has changed. A script in Pool A can call apcu_store('db_config', $data). A script in Pool B can call apcu_store('db_config', $data). Both applications will fetch their respective data perfectly, completely unaware that in the server's physical RAM, their keys are securely locked away as pool_A_db_config and pool_B_db_config.
 
 By moving the security boundary down to the Zend Engine layer, this patch achieves true multi-tenant memory isolation without sacrificing a single microsecond of performance.
