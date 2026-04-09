@@ -212,7 +212,7 @@ static PHP_MINFO_FUNCTION(apcu)
 	
 	char buf[64];
 	snprintf(buf, sizeof(buf), "Yes, current buffer size: %zu Bytes", myKeyCap);
-	php_info_print_table_row(2, "Samer Key Isolation", buf);
+	php_info_print_table_row(2, "Pool Key Isolation", buf);
 	
 	php_info_print_table_end();
 	DISPLAY_INI_ENTRIES();
