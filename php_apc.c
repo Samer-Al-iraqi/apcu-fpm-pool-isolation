@@ -26,6 +26,8 @@
 
  */
 
+ /* Modified by: Samer (FPM Pool Isolation Hack) */
+
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
@@ -44,6 +46,7 @@
 #include "ext/standard/flock_compat.h"
 #include "ext/standard/md5.h"
 #include "ext/standard/php_var.h"
+#include "samer.h"
 #if PHP_VERSION_ID >= 80000
 # include "php_apc_arginfo.h"
 #else
@@ -370,7 +373,7 @@ PHP_FUNCTION(apcu_key_info)
 		Z_PARAM_STR(key)
 	ZEND_PARSE_PARAMETERS_END();
 
-	apc_cache_stat(apc_user_cache, key, return_value);
+	apc_cache_stat(apc_user_cache, samerKey(key), return_value);
 }
 
 /* proto array apcu_sma_info([bool limited]) */
@@ -432,7 +435,7 @@ zend_bool php_apc_update(
 		apc_cache_serializer(apc_user_cache, APCG(serializer_name));
 	}
 
-	return apc_cache_atomic_update_long(apc_user_cache, key, updater, data, insert_if_not_found, ttl);
+	return apc_cache_atomic_update_long(apc_user_cache, samerKey(key), updater, data, insert_if_not_found, ttl);
 }
 
 static void apc_store_helper(INTERNAL_FUNCTION_PARAMETERS, const zend_bool exclusive)
@@ -472,7 +475,7 @@ static void apc_store_helper(INTERNAL_FUNCTION_PARAMETERS, const zend_bool exclu
 			} else {
 				hkey = zend_long_to_str(hkey_idx);
 			}
-			if (!apc_cache_store(apc_user_cache, hkey, hentry, (uint32_t) ttl, exclusive)) {
+			if (!apc_cache_store(apc_user_cache, samerKey(hkey), hentry, (uint32_t) ttl, exclusive)) {
 				zend_symtable_add_new(Z_ARRVAL_P(return_value), hkey, &fail_zv);
 			}
 			zend_string_release(hkey);
@@ -484,7 +487,7 @@ static void apc_store_helper(INTERNAL_FUNCTION_PARAMETERS, const zend_bool exclu
 			RETURN_FALSE;
 		}
 
-		RETURN_BOOL(apc_cache_store(apc_user_cache, Z_STR_P(key), val, (uint32_t) ttl, exclusive));
+		RETURN_BOOL(apc_cache_store(apc_user_cache, samerKey(Z_STR_P(key)), val, (uint32_t) ttl, exclusive));
 	} else {
 		apc_warning("apc_store expects key parameter to be a string or an array of key/value pairs.");
 		RETURN_FALSE;
@@ -604,7 +607,7 @@ PHP_FUNCTION(apcu_cas) {
 		apc_cache_serializer(apc_user_cache, APCG(serializer_name));
 	}
 
-	RETURN_BOOL(apc_cache_atomic_update_long(apc_user_cache, key, php_cas_updater, &vals, 0, 0));
+	RETURN_BOOL(apc_cache_atomic_update_long(apc_user_cache, samerKey(key), php_cas_updater, &vals, 0, 0));
 }
 
 /* proto mixed apcu_fetch(mixed key[, bool &success]) */
@@ -628,7 +631,7 @@ PHP_FUNCTION(apcu_fetch) {
 
 	/* TODO: Port to array|string for PHP 8? */
 	if (Z_TYPE_P(key) == IS_STRING) {
-		result = apc_cache_fetch(apc_user_cache, Z_STR_P(key), t, return_value);
+		result = apc_cache_fetch(apc_user_cache, samerKey(Z_STR_P(key)), t, return_value);
 	} else if (Z_TYPE_P(key) == IS_ARRAY) {
 		zval *hentry;
 
@@ -639,7 +642,7 @@ PHP_FUNCTION(apcu_fetch) {
 				zval result_entry;
 				ZVAL_UNDEF(&result_entry);
 
-				if (apc_cache_fetch(apc_user_cache, Z_STR_P(hentry), t, &result_entry)) {
+				if (apc_cache_fetch(apc_user_cache, samerKey(Z_STR_P(hentry)), t, &result_entry)) {
 					zend_hash_update(Z_ARRVAL_P(return_value), Z_STR_P(hentry), &result_entry);
 				}
 			} else {
@@ -677,7 +680,7 @@ PHP_FUNCTION(apcu_exists) {
 
 	/* TODO: Port to array|string for PHP 8? */
 	if (Z_TYPE_P(key) == IS_STRING) {
-		RETURN_BOOL(apc_cache_exists(apc_user_cache, Z_STR_P(key), t));
+		RETURN_BOOL(apc_cache_exists(apc_user_cache, samerKey(Z_STR_P(key)), t));
 	} else if (Z_TYPE_P(key) == IS_ARRAY) {
 		zval *hentry;
 		zval true_zv;
@@ -687,7 +690,7 @@ PHP_FUNCTION(apcu_exists) {
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(key), hentry) {
 			ZVAL_DEREF(hentry);
 			if (Z_TYPE_P(hentry) == IS_STRING) {
-				if (apc_cache_exists(apc_user_cache, Z_STR_P(hentry), t)) {
+				if (apc_cache_exists(apc_user_cache, samerKey(Z_STR_P(hentry)), t)) {
 					  zend_hash_add_new(Z_ARRVAL_P(return_value), Z_STR_P(hentry), &true_zv);
 				}
 			} else {
@@ -710,7 +713,7 @@ PHP_FUNCTION(apcu_delete) {
 	ZEND_PARSE_PARAMETERS_END();
 
 	if (Z_TYPE_P(keys) == IS_STRING) {
-		RETURN_BOOL(apc_cache_delete(apc_user_cache, Z_STR_P(keys)));
+		RETURN_BOOL(apc_cache_delete(apc_user_cache, samerKey(Z_STR_P(keys))));
 	} else if (Z_TYPE_P(keys) == IS_ARRAY) {
 		zval *hentry;
 
@@ -721,7 +724,7 @@ PHP_FUNCTION(apcu_delete) {
 				apc_warning("apc_delete() expects a string, array of strings, or APCIterator instance");
 				add_next_index_zval(return_value, hentry);
 				Z_TRY_ADDREF_P(hentry);
-			} else if (apc_cache_delete(apc_user_cache, Z_STR_P(hentry)) != 1) {
+			} else if (apc_cache_delete(apc_user_cache, samerKey(Z_STR_P(hentry))) != 1) {
 				add_next_index_zval(return_value, hentry);
 				Z_TRY_ADDREF_P(hentry);
 			}
@@ -748,7 +751,7 @@ PHP_FUNCTION(apcu_entry) {
 		Z_PARAM_LONG(ttl)
 	ZEND_PARSE_PARAMETERS_END();
 
-	apc_cache_entry(apc_user_cache, key, &fci, &fcc, ttl, now, return_value);
+	apc_cache_entry(apc_user_cache, samerKey(key), &fci, &fcc, ttl, now, return_value);
 }
 
 #ifdef APC_DEBUG
