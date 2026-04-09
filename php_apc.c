@@ -26,7 +26,10 @@
 
  */
 
- /* Modified by: Samer (FPM Pool Isolation Hack) */
+ /*
+ 	Modified by: Samer (FPM Pool Isolation Hack)
+	This file is taken from APCu 5.1.28
+*/
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
