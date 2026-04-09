@@ -8,6 +8,10 @@
 #include "zend_string.h"
 #include "SAPI.h"
 
+#ifdef ZTS
+#error "samer.h is not compatible with ZTS (thread-safe PHP)"
+#endif
+
 #define SAMER_INIT_SIZE 256
 /* Persistent worker-lifetime key buffer */
 static zend_string *myKey = NULL;
