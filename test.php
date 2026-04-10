@@ -131,7 +131,7 @@ $multiKeys('apcu_fetch', array_fill_keys(keys, 'value'));
 
 
 echo "\nAPCu contents:\n";
-$it = new APCUIterator('/_test_key_/');
+$it = new APCUIterator('/test_key_/');
 foreach ($it as $i=>$item) {
 	$key=strlen($item['key']) > 50 ? (substr($item['key'], 0, 50) . '...') : $item['key'];
 	echo "Key: $key, Value: {$item['value']}\n";
