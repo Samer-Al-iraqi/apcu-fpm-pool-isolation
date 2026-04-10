@@ -115,6 +115,8 @@ While this extension successfully enforces cross-tenant memory isolation, system
 
 6. The extension is highly optimized, initializing its persistent string buffer at 256 bytes (which covers 99.9% of real-world cache keys). If an application attempts to save an exceptionally long key (e.g., 1024+ bytes), the extension will safely and dynamically realloc the buffer to accommodate it. Because this buffer is persistent across the worker's lifetime, this memory reallocation only happens once per worker, ensuring zero performance penalty on all subsequent requests.
 
+7. PHP ZTS builds is not supported here. If you try to **make** apcu in a ZTS build, #error with clear message will stop you. who would use FPM with ZTS anyway.
+
 
 ### Appendx: apcu functions that accept **key** parameter
 - apcu_add
