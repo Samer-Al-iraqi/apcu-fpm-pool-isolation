@@ -104,8 +104,9 @@ withKeys(1, 'apcu_dec', 1, $success, 10);
 
 
 $ekeys=str_args(keys, 'trimKey');
-$multiKeys=function($fn, $expected) use($ekeys) {
-	$ret=$fn(keys);
+$multiKeys=function($fn, $expected, $values=null) use($ekeys) {
+	if($values) $ret=$fn($values, null, 10);
+	else $ret=$fn(keys);
 	$ok= ($expected==$ret);
 	$ret=str_args($ret, 'trimKey');
 	echo "\n$fn($ekeys) = [$ret] ";
@@ -123,6 +124,8 @@ $multiKeys('apcu_delete', []);
 $multiKeys('apcu_delete', keys);
 $multiKeys('apcu_exists', []);
 withKeys('value', 'apcu_entry', fn($key) => "value", 10);
+$multiKeys('apcu_store', [], array_fill_keys(keys, 'value'));
+$multiKeys('apcu_add', array_fill_keys(keys, -1), array_fill_keys(keys, 'value'));
 $multiKeys('apcu_exists', array_fill_keys(keys, true));
 $multiKeys('apcu_fetch', array_fill_keys(keys, 'value'));
 
