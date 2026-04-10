@@ -1,6 +1,8 @@
 # apcu-fpm-pool-isolation
 APCu C-level key namespacing for PHP-FPM: Isolation of key spaces by pool name to prevent collisions and cross-pool data tampering
 
+**Update**: Please note that the isolation method outlined here is not a complete security boundary and can be bypassed in certain edge cases by compromised app. Read the discussion [below my article in reddit](https://www.reddit.com/r/PHP/comments/1sg9rln/clevel_apcu_key_isolation_based_on_fpm_pool_names/).
+
 apcu is a fantastic in-memory key-value store extension; unlike other solutions, it doesn't require a separate PHP service, but rather runs within it, relying on PHP's own master process. It's very fast, simple, and excellent for many small and medium-sized applications.
 
 The problem with apcu (and it's the same problem with other solutions like memcached ) is that it doesn't provide isolation between entries coming from different pools. The general rule is that each independent application has its own pool, allowing it to be isolated with its own system user and configuration. This provides high security if one application is compromised.
